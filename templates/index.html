@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sinhala corpus search demo</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #222;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+  }
+  .search-bar {
+    display: flex;
+    gap: 8px;
+    margin: 20px 0 30px;
+  }
+  #query {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 15px;
+    border: none;
+    border-radius: 6px;
+    background: #2d6ae0;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover { background: #1f52b8; }
+  .columns {
+    display: flex;
+    gap: 24px;
+  }
+  .column {
+    flex: 1;
+    min-width: 0;
+  }
+  .column h2 {
+    font-size: 16px;
+    font-weight: 500;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 6px;
+  }
+  .result {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .result .title {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .result .meta {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 6px;
+  }
+  .result .snippet {
+    font-size: 14px;
+    color: #444;
+  }
+  .result .score {
+    display: inline-block;
+    font-size: 11px;
+    color: #2d6ae0;
+    background: #eaf0fd;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  .empty {
+    color: #999;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Sinhala corpus search demo</h1>
+<p style="color:#666; font-size: 14px;">Enter a query in Sinhala. Results from semantic search (LaBSE + FAISS) and keyword search (BM25) are shown side by side.</p>
+
+<div class="search-bar">
+  <input type="text" id="query" placeholder="e.g. ක්‍රිකට් තරගය" />
+  <button onclick="runSearch()">Search</button>
+</div>
+
+<div class="columns">
+  <div class="column">
+    <h2>Semantic search</h2>
+    <div id="semantic-results"><p class="empty">No results yet.</p></div>
+  </div>
+  <div class="column">
+    <h2>Keyword search (BM25)</h2>
+    <div id="keyword-results"><p class="empty">No results yet.</p></div>
+  </div>
+</div>
+
+<script>
+async function runSearch() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) return;
+
+  const semanticDiv = document.getElementById('semantic-results');
+  const keywordDiv = document.getElementById('keyword-results');
+  semanticDiv.innerHTML = '<p class="empty">Searching...</p>';
+  keywordDiv.innerHTML = '<p class="empty">Searching...</p>';
+
+  try {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&top_k=5`);
+    const data = await response.json();
+
+    if (data.error) {
+      semanticDiv.innerHTML = `<p class="empty">${data.error}</p>`;
+      keywordDiv.innerHTML = `<p class="empty">${data.error}</p>`;
+      return;
+    }
+
+    semanticDiv.innerHTML = renderResults(data.semantic);
+    keywordDiv.innerHTML = renderResults(data.keyword);
+  } catch (err) {
+    semanticDiv.innerHTML = '<p class="empty">Search failed. Check the server console.</p>';
+    keywordDiv.innerHTML = '<p class="empty">Search failed. Check the server console.</p>';
+  }
+}
+
+function renderResults(results) {
+  if (!results || results.length === 0) {
+    return '<p class="empty">No results.</p>';
+  }
+  return results.map(r => `
+    <div class="result">
+      <div class="score">${r.score}</div>
+      <div class="title">${escapeHtml(r.title)}</div>
+      <div class="meta">${escapeHtml(r.source)} &middot; ${escapeHtml(r.category)} &middot; ${escapeHtml(r.published_at)}</div>
+      <div class="snippet">${escapeHtml(r.snippet)}...</div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById('query').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') runSearch();
+});
+</script>
+
+</body>
+</html>
